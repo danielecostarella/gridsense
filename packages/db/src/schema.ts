@@ -4,6 +4,7 @@ import {
   real,
   doublePrecision,
   timestamp,
+  text,
   index,
 } from "drizzle-orm/pg-core";
 
@@ -72,3 +73,25 @@ export const emReadings = pgTable(
 
 export type EmReading = typeof emReadings.$inferSelect;
 export type NewEmReading = typeof emReadings.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// anomalies — detector events (hypertable via 0001_anomalies.sql)
+// ---------------------------------------------------------------------------
+export const anomaliesTable = pgTable(
+  "anomalies",
+  {
+    detectedAt:  timestamp("detected_at", { withTimezone: true, mode: "date" }).notNull(),
+    channelId:   smallint("channel_id").notNull(),
+    type:        text("type").notNull(),
+    actPowerW:   real("act_power_w").notNull(),
+    baselineW:   real("baseline_w").notNull(),
+    deviation:   real("deviation").notNull(),
+    description: text("description").notNull(),
+  },
+  (t) => [
+    index("anomalies_detected_at_idx").on(t.detectedAt, t.channelId),
+  ]
+);
+
+export type AnomalyRow = typeof anomaliesTable.$inferSelect;
+export type NewAnomalyRow = typeof anomaliesTable.$inferInsert;

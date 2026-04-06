@@ -98,6 +98,26 @@ test.describe("Energy summary", () => {
   });
 });
 
+test.describe("Tariff & cost", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+  });
+
+  test("shows tariff band badge in header", async ({ page }) => {
+    const badge = page.getByTestId("tariff-band");
+    await expect(badge).toBeVisible({ timeout: 10_000 });
+    // Must contain one of the three Italian tariff bands
+    await expect(badge).toContainText(/F[123]/);
+  });
+
+  test("shows cost card with euro value", async ({ page }) => {
+    const card = page.getByTestId("cost-card");
+    await expect(card).toBeVisible();
+    // Should contain a euro symbol after data loads
+    await expect(card).toContainText("€", { timeout: 15_000 });
+  });
+});
+
 test.describe("Historical chart", () => {
   test("renders power chart container", async ({ page }) => {
     await page.goto("/");

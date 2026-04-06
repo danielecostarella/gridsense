@@ -11,6 +11,7 @@ services:
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
       - ./packages/db/migrations/0000_init.sql:/docker-entrypoint-initdb.d/0000_init.sql:ro
+      - ./packages/db/migrations/0001_anomalies.sql:/docker-entrypoint-initdb.d/0001_anomalies.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U gridsense -d gridsense"]
       interval: 5s
@@ -28,6 +29,20 @@ services:
       timeout: 3s
       retries: 5
 
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/#", "-C", "1", "-i", "healthcheck", "-W", "3"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   collector:
     build:
       context: .
@@ -42,6 +57,10 @@ services:
       SHELLY_HOST: ${SHELLY_HOST:-192.168.1.6}
       SHELLY_POLL_INTERVAL_MS: ${SHELLY_POLL_INTERVAL_MS:-5000}
       SHELLY_TIMEOUT_MS: ${SHELLY_TIMEOUT_MS:-3000}
+      # Set SHELLY_MQTT_PREFIX to switch from HTTP polling to MQTT mode.
+      # Run scripts/configure-shelly-mqtt.ts first to configure the device.
+      SHELLY_MQTT_PREFIX: ${SHELLY_MQTT_PREFIX:-}
+      MQTT_BROKER_URL: mqtt://mosquitto:1883
       DATABASE_URL: postgres://gridsense:gridsense@timescaledb:5432/gridsense
       REDIS_URL: redis://redis:6379
       COLLECTOR_PORT: 3001
@@ -84,3 +103,4 @@ services:
 
 volumes:
   timescaledb_data:
+  mosquitto_data:

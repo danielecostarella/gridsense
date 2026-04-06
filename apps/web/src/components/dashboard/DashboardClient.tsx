@@ -6,6 +6,9 @@ import { MetricCard } from "./MetricCard";
 import { ConnectionBadge } from "./ConnectionBadge";
 import { PowerChart } from "./PowerChart";
 import { TodayEnergy } from "./TodayEnergy";
+import { CostCard } from "./CostCard";
+import { TariffBand } from "./TariffBand";
+import { AnomalyAlert } from "./AnomalyAlert";
 
 export function DashboardClient() {
   const { data, connectionState } = useLiveData();
@@ -32,12 +35,13 @@ export function DashboardClient() {
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {lastSeen && (
               <span className="hidden sm:block text-xs text-[var(--color-muted)]">
                 {lastSeen}
               </span>
             )}
+            <TariffBand />
             <ConnectionBadge state={connectionState} />
           </div>
         </div>
@@ -138,7 +142,10 @@ export function DashboardClient() {
           </div>
         </div>
 
-        {/* Row 2: Energy totals + Today summary */}
+        {/* Anomaly alerts — visible only when anomalies exist */}
+        <AnomalyAlert />
+
+        {/* Row 2: Energy totals + Today summary + Cost */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <MetricCard
             label="CH·0 Energy"
@@ -167,6 +174,7 @@ export function DashboardClient() {
             testId="metric-ch1-returned"
           />
           <TodayEnergy />
+          <CostCard />
         </div>
 
         {/* Row 3: Historical chart */}

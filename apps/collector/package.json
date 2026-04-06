@@ -9,9 +9,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@gridsense/anomaly": "workspace:*",
     "@gridsense/db": "workspace:*",
     "@gridsense/events": "workspace:*",
     "@gridsense/shelly-client": "workspace:*",
+    "@gridsense/tariff": "workspace:*",
     "hono": "^4.6.0"
   },
   "devDependencies": {

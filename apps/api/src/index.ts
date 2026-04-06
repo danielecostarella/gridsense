@@ -7,6 +7,8 @@ import { ReadingsSubscriber } from "@gridsense/events";
 import { readingsRouter } from "./routes/readings.js";
 import { energyRouter } from "./routes/energy.js";
 import { liveRouter } from "./routes/live.js";
+import { costRouter } from "./routes/cost.js";
+import { anomaliesRouter } from "./routes/anomalies.js";
 import { buildWsRouter, websocket, wsConnectionCount } from "./routes/ws.js";
 
 // ---------------------------------------------------------------------------
@@ -47,6 +49,8 @@ app.use("*", logger());
 
 app.route("/api/readings", readingsRouter(db));
 app.route("/api/energy", energyRouter(db));
+app.route("/api/cost", costRouter(db));
+app.route("/api/anomalies", anomaliesRouter(db));
 app.route("/api/live", liveRouter(shellyClient));
 app.route("/ws", buildWsRouter(subscriber));
 
