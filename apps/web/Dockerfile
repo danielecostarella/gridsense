@@ -16,6 +16,8 @@ COPY apps/web/ ./apps/web/
 
 WORKDIR /workspace/apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
+# Ensure public dir exists even if empty (required by standalone output COPY)
+RUN mkdir -p public
 RUN npm run build
 
 # ── runner: minimal production image ──────────────────────────────────────
