@@ -1,0 +1,14 @@
+{
+  "name": "gridsense",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "collector": "bun run apps/collector/src/index.ts",
+    "db:migrate": "bun run packages/db/scripts/migrate.ts",
+    "typecheck": "tsc --build"
+  }
+}
