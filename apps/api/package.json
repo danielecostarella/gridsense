@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@gridsense/db": "workspace:*",
+    "@gridsense/events": "workspace:*",
     "@gridsense/shelly-client": "workspace:*",
     "hono": "^4.6.0"
   },

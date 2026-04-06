@@ -17,6 +17,17 @@ services:
       timeout: 5s
       retries: 10
 
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   collector:
     build:
       context: .
@@ -25,16 +36,17 @@ services:
     depends_on:
       timescaledb:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       SHELLY_HOST: ${SHELLY_HOST:-192.168.1.6}
       SHELLY_POLL_INTERVAL_MS: ${SHELLY_POLL_INTERVAL_MS:-5000}
       SHELLY_TIMEOUT_MS: ${SHELLY_TIMEOUT_MS:-3000}
       DATABASE_URL: postgres://gridsense:gridsense@timescaledb:5432/gridsense
+      REDIS_URL: redis://redis:6379
       COLLECTOR_PORT: 3001
     ports:
       - "3001:3001"
-    # Docker Desktop (macOS/Windows) routes host traffic automatically.
-    # On Linux set COLLECTOR_NETWORK_MODE=host in .env.
     network_mode: ${COLLECTOR_NETWORK_MODE:-bridge}
 
   api:
@@ -45,14 +57,30 @@ services:
     depends_on:
       timescaledb:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       SHELLY_HOST: ${SHELLY_HOST:-192.168.1.6}
       SHELLY_TIMEOUT_MS: ${SHELLY_TIMEOUT_MS:-3000}
       DATABASE_URL: postgres://gridsense:gridsense@timescaledb:5432/gridsense
+      REDIS_URL: redis://redis:6379
       API_PORT: 3000
     ports:
       - "3000:3000"
     network_mode: ${COLLECTOR_NETWORK_MODE:-bridge}
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:3000}
+    ports:
+      - "3002:3002"
 
 volumes:
   timescaledb_data:

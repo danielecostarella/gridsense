@@ -2,37 +2,45 @@
 
 **Self-hosted IoT energy intelligence platform** for the Shelly Pro EM-50 smart meter.
 
-GridSense goes beyond device monitoring: it ingests raw electrical measurements at 5-second resolution, stores them in a time-series database optimised for energy data, and (roadmap) provides real-time insights, automated decision loops, and an extensible architecture for smart meters and edge devices.
+GridSense goes beyond device monitoring: it ingests raw electrical measurements at 5-second resolution, stores them in a time-series database, and delivers real-time insights through a modern dashboard — power flow animations, energy cost tracking, anomaly detection (roadmap), and a natural-language AI assistant (roadmap).
+
+→ [Architecture & design decisions](docs/architecture.md)
+
+---
+
+## Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Runtime | [Bun](https://bun.sh) |
+| HTTP & WebSocket | [Hono](https://hono.dev) |
+| Real-time bus | Redis 7 (pub/sub) |
+| Database | [TimescaleDB](https://www.timescale.com) — PostgreSQL 16 + time-series engine |
+| ORM / schema | [Drizzle ORM](https://orm.drizzle.team) |
+| Frontend | [Next.js 15](https://nextjs.org) · React 19 · Tailwind CSS v4 |
+| Animations | [Framer Motion](https://www.framer.com/motion/) |
+| Charts | [Recharts](https://recharts.org) |
+| E2E tests | [Playwright](https://playwright.dev) |
+| Containerisation | Docker Compose |
 
 ---
 
 ## Architecture
 
 ```
-Shelly Pro EM-50  ──HTTP polling──▶  collector  ──▶  TimescaleDB
-                                         │
-                                         └──▶  REST API  ◀──  (future) web dashboard
+Shelly Pro EM-50
+      │ HTTP RPC (every 5s)
+      ▼
+  collector ──► TimescaleDB (em_readings hypertable)
+      │
+      └──► Redis pub/sub ──► api WebSocket ──► browser
+                               │
+                               └── REST API (history, energy delta, live)
 ```
 
-| Layer | Technology |
-|-------|-----------|
-| Runtime | [Bun](https://bun.sh) |
-| HTTP framework | [Hono](https://hono.dev) |
-| Database | [TimescaleDB](https://www.timescale.com) (PostgreSQL + time-series engine) |
-| ORM / schema | [Drizzle ORM](https://orm.drizzle.team) |
-| Containerisation | Docker Compose |
+Full diagram and design rationale: [docs/architecture.md](docs/architecture.md)
 
-## Monorepo structure
-
-```
-gridsense/
-├── apps/
-│   └── collector/          # Polling service — reads Shelly, writes to DB
-├── packages/
-│   ├── shelly-client/      # Typed HTTP client for the Shelly Pro EM-50 RPC API
-│   └── db/                 # Drizzle schema, TimescaleDB migrations, DB client
-└── docker-compose.yml
-```
+---
 
 ## Getting started
 
@@ -44,50 +52,92 @@ gridsense/
 
 ```bash
 cp .env.example .env
-# Edit .env — set SHELLY_HOST to your device's IP
+# Edit .env — set SHELLY_HOST to your device's IP (default: 192.168.1.6)
 
 docker compose up --build
 ```
 
-TimescaleDB is initialised automatically on first start (hypertable, continuous aggregates, 90-day retention policy).
+TimescaleDB initialises automatically on first start (hypertable, 1-minute continuous aggregate, 90-day retention policy).
 
-### Verify
+### Endpoints
+
+| URL | Description |
+|-----|-------------|
+| `http://localhost:3002` | Web dashboard |
+| `http://localhost:3000/api/live` | Current reading direct from Shelly |
+| `http://localhost:3000/api/energy/today` | Today's consumption |
+| `http://localhost:3000/api/readings/history?from=…` | Historical time-series |
+| `ws://localhost:3000/ws` | Real-time WebSocket stream |
+| `http://localhost:3001/health` | Collector health |
+
+---
+
+## API reference
+
+### `GET /api/readings/history`
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `from` | ISO 8601 | required | Start of window |
+| `to` | ISO 8601 | now | End of window |
+| `channel` | `0` \| `1` | both | Filter by channel |
+| `resolution` | `5s` \| `1m` \| `5m` \| `15m` \| `1h` | auto | Time bucket size |
+
+### `GET /api/energy/delta`
+
+Returns energy consumed and returned (Wh) between two timestamps using the device's cumulative counter — identical semantics to an electricity meter reading.
+
+### `WS /ws`
+
+Pushes a `LiveReadingsEvent` JSON frame every ~5s (collector poll interval). Send `"ping"` to receive `"pong"` for keepalive checking.
+
+---
+
+## E2E tests
 
 ```bash
-# Live reading from the meter
-curl http://localhost:3001/latest | jq
+# Start the full stack
+docker compose up -d
 
-# Collector health
-curl http://localhost:3001/health | jq
+# Run Playwright tests (requires Node on host for the test runner)
+cd apps/web
+npx playwright install --with-deps chromium
+npx playwright test
 ```
 
-## Data model
+Reports are generated in `apps/web/playwright-report/`.
 
-The core table `em_readings` is a [TimescaleDB hypertable](https://docs.timescale.com/use-timescale/latest/hypertables/) partitioned in 7-day chunks. Each row represents one channel snapshot:
+---
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `sampled_at` | `timestamptz` | Wall-clock timestamp of the poll |
-| `channel_id` | `smallint` | 0 = channel A, 1 = channel B |
-| `voltage` | `real` | RMS voltage [V] |
-| `current` | `real` | RMS current [A] |
-| `act_power` | `real` | Active power [W] |
-| `aprt_power` | `real` | Apparent power [VA] |
-| `power_factor` | `real` | Power factor [-1, 1] |
-| `frequency` | `real` | Line frequency [Hz] |
-| `reactive_power` | `real` | Reactive power magnitude [VAr] |
-| `total_act_energy` | `double precision` | Cumulative consumed energy [Wh] |
-| `total_act_ret_energy` | `double precision` | Cumulative returned energy [Wh] — non-zero with PV/battery |
+## Monorepo layout
 
-A 1-minute continuous aggregate (`em_readings_1m`) materialises min/max/avg rollups automatically.
+```
+gridsense/
+├── apps/
+│   ├── collector/          Poll loop — reads Shelly, writes DB + Redis
+│   ├── api/                REST API + WebSocket (Hono)
+│   └── web/                Next.js 15 dashboard + Playwright E2E
+├── packages/
+│   ├── shelly-client/      Typed HTTP client for Shelly Gen2 RPC API
+│   ├── db/                 Drizzle schema + TimescaleDB migration
+│   └── events/             Redis pub/sub types, publisher, subscriber
+├── docs/
+│   └── architecture.md     System design & decisions
+└── docker-compose.yml
+```
+
+---
 
 ## Roadmap
 
-- [ ] REST API with historical queries and energy delta calculations
-- [ ] Real-time WebSocket push to frontend
-- [ ] Web dashboard — power flow visualisation, cost tracking, anomaly detection
-- [ ] Tariff engine (Italian F1/F2/F3 time-of-use bands)
-- [ ] AI assistant for natural language queries on consumption data
+- [x] Data acquisition — Shelly HTTP polling → TimescaleDB
+- [x] REST API — historical queries, energy delta, live endpoint
+- [x] Real-time — Redis pub/sub → WebSocket → dashboard
+- [x] Web dashboard — power flow, live metrics, 1h chart
+- [ ] Tariff engine — Italian F1/F2/F3 time-of-use cost calculation
+- [ ] Anomaly detection — statistical spike detection, idle load alerts
+- [ ] Demand forecasting — pattern-based next-hour prediction
+- [ ] AI assistant — natural language queries on consumption data
 
 ## License
 
