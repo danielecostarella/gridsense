@@ -6,7 +6,7 @@ COPY packages/shelly-client/package.json ./packages/shelly-client/
 COPY packages/db/package.json ./packages/db/
 COPY apps/api/package.json ./apps/api/
 
-RUN bun install --frozen-lockfile
+RUN bun install
 
 COPY packages/shelly-client/src ./packages/shelly-client/src
 COPY packages/db/src ./packages/db/src
