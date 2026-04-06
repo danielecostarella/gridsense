@@ -10,7 +10,6 @@ services:
       - "5432:5432"
     volumes:
       - timescaledb_data:/var/lib/postgresql/data
-      # Schema is applied automatically on first start
       - ./packages/db/migrations/0000_init.sql:/docker-entrypoint-initdb.d/0000_init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U gridsense -d gridsense"]
@@ -34,9 +33,25 @@ services:
       COLLECTOR_PORT: 3001
     ports:
       - "3001:3001"
-    # The collector must reach the Shelly on the local LAN.
-    # host networking is the cleanest option on Linux; on macOS/Windows
-    # Docker Desktop routes traffic through the host automatically.
+    # Docker Desktop (macOS/Windows) routes host traffic automatically.
+    # On Linux set COLLECTOR_NETWORK_MODE=host in .env.
+    network_mode: ${COLLECTOR_NETWORK_MODE:-bridge}
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      SHELLY_HOST: ${SHELLY_HOST:-192.168.1.6}
+      SHELLY_TIMEOUT_MS: ${SHELLY_TIMEOUT_MS:-3000}
+      DATABASE_URL: postgres://gridsense:gridsense@timescaledb:5432/gridsense
+      API_PORT: 3000
+    ports:
+      - "3000:3000"
     network_mode: ${COLLECTOR_NETWORK_MODE:-bridge}
 
 volumes:
