@@ -64,13 +64,6 @@ services:
       COLLECTOR_PORT: 3001
     ports:
       - "3001:3001"
-    # On macOS/Windows Docker Desktop the default compose network already
-    # reaches the LAN (192.168.x.x) through the host — no override needed.
-    # On Linux without Docker Desktop set COLLECTOR_NETWORK_MODE=host.
-    networks:
-      - gridsense
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   api:
     build:
@@ -90,10 +83,6 @@ services:
       API_PORT: 3000
     ports:
       - "3000:3000"
-    networks:
-      - gridsense
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   web:
     build:
@@ -103,19 +92,11 @@ services:
     depends_on:
       - api
     environment:
-      # Server-side rewrite target (container-to-container, never exposed to browser)
       API_INTERNAL_URL: http://api:3000
-      # Browser-side URLs (must be reachable from the user's machine)
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
       NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-ws://localhost:3000}
     ports:
       - "3002:3002"
-    networks:
-      - gridsense
-
-networks:
-  gridsense:
-    driver: bridge
 
 volumes:
   timescaledb_data:

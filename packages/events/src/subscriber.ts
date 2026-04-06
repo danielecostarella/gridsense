@@ -9,22 +9,40 @@ export class ReadingsSubscriber {
   private handlers = new Set<ReadingsHandler>();
 
   constructor(redisUrl: string) {
-    // Subscriber connections are dedicated — cannot issue other commands
-    this.redis = new Redis(redisUrl, { lazyConnect: true });
+    // Subscriber connections are dedicated — cannot issue regular commands
+    this.redis = new Redis(redisUrl, {
+      retryStrategy: (times) => Math.min(times * 200, 3000),
+      enableReadyCheck: true,
+    });
+
+    this.redis.on("error", (err: Error) => {
+      console.error(
+        JSON.stringify({
+          ts: new Date().toISOString(),
+          level: "error",
+          event: "redis_sub_error",
+          error: err?.message ?? String(err),
+        })
+      );
+    });
   }
 
   async connect(): Promise<void> {
-    await this.redis.connect();
+    if (this.redis.status !== "ready") {
+      await new Promise<void>((resolve, reject) => {
+        this.redis.once("ready", resolve);
+        this.redis.once("error", reject);
+      });
+    }
+
     await this.redis.subscribe(CHANNEL_READINGS);
 
     this.redis.on("message", (_channel: string, payload: string) => {
       try {
         const event = JSON.parse(payload) as LiveReadingsEvent;
-        for (const handler of this.handlers) {
-          handler(event);
-        }
+        for (const handler of this.handlers) handler(event);
       } catch {
-        // Malformed payload — ignore
+        // Ignore malformed payload
       }
     });
   }
