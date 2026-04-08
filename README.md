@@ -6,6 +6,8 @@ GridSense goes beyond device monitoring: it ingests raw electrical measurements 
 
 → [Architecture & design decisions](docs/architecture.md)
 
+![GridSense Dashboard](docs/screenshots/dashboard.png)
+
 ---
 
 ## Stack

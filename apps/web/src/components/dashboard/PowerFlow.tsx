@@ -9,7 +9,6 @@ interface Props {
 
 const GRID_COLOR = "#818cf8";   // accent
 const LOAD_COLOR = "#f59e0b";   // power amber
-const SOLAR_COLOR = "#10b981";  // solar green
 
 function Particle({
   pathId,
@@ -132,7 +131,6 @@ export function PowerFlow({ data }: Props) {
 
   const gridActive = (ch0?.actPowerW ?? 0) > 5;
   const ch1Active = (ch1?.actPowerW ?? 0) > 5;
-  const solarActive = (ch1?.totalActRetEnergyKwh ?? 0) > 0;
 
   // Derive particle speed from power magnitude (higher power = faster particles)
   const ch0Duration = Math.max(0.8, 3 - ((ch0?.actPowerW ?? 0) / 3000) * 2);
@@ -162,8 +160,8 @@ export function PowerFlow({ data }: Props) {
         <FlowLine
           pathId="p-ch1-home"
           d="M 70,148 C 120,148 180,130 230,105"
-          color={ch1Active ? LOAD_COLOR : SOLAR_COLOR}
-          active={ch1Active || solarActive}
+          color={LOAD_COLOR}
+          active={ch1Active}
           particleCount={2}
           duration={ch1Duration}
         />
@@ -201,10 +199,10 @@ export function PowerFlow({ data }: Props) {
         <NodeCircle
           cx={52}
           cy={148}
-          label={solarActive ? "PV" : "CH·1"}
-          sublabel={solarActive ? "solar" : "aux"}
-          color={solarActive ? SOLAR_COLOR : LOAD_COLOR}
-          active={ch1Active || solarActive}
+          label="CH·1"
+          sublabel="aux"
+          color={LOAD_COLOR}
+          active={ch1Active}
         />
 
         {/* Home */}
