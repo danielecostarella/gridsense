@@ -9,6 +9,8 @@ import { TodayEnergy } from "./TodayEnergy";
 import { CostCard } from "./CostCard";
 import { TariffBand } from "./TariffBand";
 import { AnomalyAlert } from "./AnomalyAlert";
+import { ConsumptionChart } from "./ConsumptionChart";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function DashboardClient() {
   const { data, connectionState } = useLiveData();
@@ -22,7 +24,7 @@ export function DashboardClient() {
     : null;
 
   return (
-    <div className="min-h-dvh bg-[var(--color-grid-950)] text-slate-100">
+    <div className="min-h-dvh bg-[var(--color-grid-950)] text-[var(--color-fg)]">
       {/* ── Header ── */}
       <header className="sticky top-0 z-10 border-b border-[var(--color-grid-700)] bg-[var(--color-grid-950)]/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
@@ -42,6 +44,7 @@ export function DashboardClient() {
               </span>
             )}
             <TariffBand />
+            <ThemeToggle />
             <ConnectionBadge state={connectionState} />
           </div>
         </div>
@@ -177,9 +180,14 @@ export function DashboardClient() {
           <CostCard />
         </div>
 
-        {/* Row 3: Historical chart */}
-        <div className="bg-[var(--color-grid-800)] rounded-xl p-5 border border-[var(--color-grid-600)]">
-          <PowerChart />
+        {/* Row 3: Historical power chart + consumption bar chart */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-[var(--color-grid-800)] rounded-xl p-5 border border-[var(--color-grid-600)]">
+            <PowerChart />
+          </div>
+          <div className="bg-[var(--color-grid-800)] rounded-xl p-5 border border-[var(--color-grid-600)]">
+            <ConsumptionChart />
+          </div>
         </div>
       </main>
     </div>

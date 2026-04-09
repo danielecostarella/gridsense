@@ -4,6 +4,7 @@ import {
   getEnergyDelta,
   getEnergyToday,
   getPowerStats,
+  getConsumptionByPeriod,
 } from "../services/energy.service.js";
 
 export function energyRouter(db: Db) {
@@ -102,6 +103,44 @@ export function energyRouter(db: Db) {
 
     const stats = await getPowerStats(db, from, to);
     return c.json({ data: stats, meta: { from, to } });
+  });
+
+  /**
+   * GET /energy/consumption
+   *
+   * Consumption per time bucket, grouped by day / month / year.
+   * Uses the device's cumulative counters (max-min per bucket).
+   *
+   * Query params:
+   *   period  "day" | "month" | "year"  (default: "day")
+   *   from    ISO 8601  (default: 30 days ago for day, 12 months ago for month/year)
+   *   to      ISO 8601  (default: now)
+   */
+  app.get("/consumption", async (c) => {
+    const raw = c.req.query("period") ?? "day";
+    if (raw !== "day" && raw !== "month" && raw !== "year") {
+      return c.json({ error: "period must be day, month, or year" }, 400);
+    }
+    const period = raw as "day" | "month" | "year";
+
+    const to = c.req.query("to") ? new Date(c.req.query("to")!) : new Date();
+
+    let from: Date;
+    if (c.req.query("from")) {
+      from = new Date(c.req.query("from")!);
+    } else {
+      from = new Date(to);
+      if (period === "day") from.setDate(from.getDate() - 30);
+      else if (period === "month") from.setMonth(from.getMonth() - 12);
+      else from.setFullYear(from.getFullYear() - 5);
+    }
+
+    if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+      return c.json({ error: "Invalid date format. Use ISO 8601." }, 400);
+    }
+
+    const data = await getConsumptionByPeriod(db, period, from, to);
+    return c.json({ data, meta: { period, from, to } });
   });
 
   return app;

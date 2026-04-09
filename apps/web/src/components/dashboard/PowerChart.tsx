@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
+import { useTheme } from "@/context/ThemeContext";
 
 interface HistoryPoint {
   bucket: string;
@@ -67,7 +68,14 @@ const CustomTooltip = ({
   );
 };
 
+const CHART_COLORS = {
+  dark:  { grid: "#1f1f35", tick: "#64748b" },
+  light: { grid: "#e2e8f0", tick: "#94a3b8" },
+};
+
 export function PowerChart() {
+  const { theme } = useTheme();
+  const cc = CHART_COLORS[theme];
   const { data, isLoading, isError } = useQuery({
     queryKey: ["history", "1h"],
     queryFn: fetchHistory,
@@ -108,16 +116,16 @@ export function PowerChart() {
               <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#1f1f35" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke={cc.grid} vertical={false} />
           <XAxis
             dataKey="time"
-            tick={{ fill: "#64748b", fontSize: 10 }}
+            tick={{ fill: cc.tick, fontSize: 10 }}
             tickLine={false}
             axisLine={false}
             interval="preserveStartEnd"
           />
           <YAxis
-            tick={{ fill: "#64748b", fontSize: 10 }}
+            tick={{ fill: cc.tick, fontSize: 10 }}
             tickLine={false}
             axisLine={false}
             unit=" W"

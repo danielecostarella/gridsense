@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand palette */
+  /* Brand palette — static, used by Tailwind utilities */
   --color-grid-950: #07070f;
   --color-grid-900: #0e0e1a;
   --color-grid-800: #161625;
@@ -26,6 +26,41 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
+/* ── Semantic theme tokens ────────────────────────────────────────────────
+   These are the only vars components should use for theme-sensitive values.
+   Dark mode is the default (no [data-theme] attribute needed).
+   ──────────────────────────────────────────────────────────────────────── */
+:root {
+  --color-fg:           #f1f5f9;
+  --color-fg-secondary: #cbd5e1;
+  --color-node-bg:      #161625;   /* SVG node circle fills */
+  --color-chart-grid:   #1f1f35;   /* Recharts grid lines */
+  --color-chart-tick:   #64748b;   /* Recharts axis ticks */
+  --color-chart-cursor: #1f1f35;   /* Recharts bar hover cursor */
+  --color-chart-legend: #64748b;
+}
+
+/* ── Light theme overrides ────────────────────────────────────────────── */
+[data-theme="light"] {
+  /* Surface palette — reuse the same grid-* names */
+  --color-grid-950: #f8fafc;
+  --color-grid-900: #f1f5f9;
+  --color-grid-800: #ffffff;
+  --color-grid-700: #f1f5f9;
+  --color-grid-600: #e2e8f0;
+  --color-muted:    #94a3b8;
+
+  /* Semantic tokens */
+  --color-fg:           #0f172a;
+  --color-fg-secondary: #334155;
+  --color-node-bg:      #ffffff;
+  --color-chart-grid:   #e2e8f0;
+  --color-chart-tick:   #94a3b8;
+  --color-chart-cursor: #f1f5f9;
+  --color-chart-legend: #64748b;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────────── */
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;
@@ -33,9 +68,10 @@
 
   html {
     background-color: var(--color-grid-950);
-    color: #f1f5f9;
+    color: var(--color-fg);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   body {
@@ -43,7 +79,11 @@
   }
 }
 
-/* Animated energy particle flowing along a path */
+/* ── SVG theme helpers ────────────────────────────────────────────────── */
+.svg-node-bg   { fill: var(--color-node-bg); }
+.svg-text-muted { fill: var(--color-chart-tick); }
+
+/* ── Animated energy particle ─────────────────────────────────────────── */
 @keyframes flow {
   0%   { offset-distance: 0%;   opacity: 0; }
   10%  { opacity: 1; }

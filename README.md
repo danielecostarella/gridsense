@@ -2,7 +2,7 @@
 
 **Self-hosted IoT energy intelligence platform** for the Shelly Pro EM-50 smart meter.
 
-GridSense goes beyond device monitoring: it ingests raw electrical measurements at 5-second resolution, stores them in a time-series database, and delivers real-time insights through a modern dashboard — power flow animations, energy cost tracking, anomaly detection (roadmap), and a natural-language AI assistant (roadmap).
+GridSense goes beyond device monitoring: it ingests raw electrical measurements at 5-second resolution, stores them in a time-series database, and delivers real-time insights through a modern dashboard — animated power flow, energy cost tracking, statistical anomaly detection, and a dark/light theme toggle. A natural-language AI assistant is on the roadmap.
 
 → [Architecture & design decisions](docs/architecture.md)
 
@@ -17,6 +17,7 @@ GridSense goes beyond device monitoring: it ingests raw electrical measurements 
 | Runtime | [Bun](https://bun.sh) |
 | HTTP & WebSocket | [Hono](https://hono.dev) |
 | Real-time bus | Redis 7 (pub/sub) |
+| Message broker | Mosquitto 2 (MQTT) |
 | Database | [TimescaleDB](https://www.timescale.com) — PostgreSQL 16 + time-series engine |
 | ORM / schema | [Drizzle ORM](https://orm.drizzle.team) |
 | Frontend | [Next.js 15](https://nextjs.org) · React 19 · Tailwind CSS v4 |
@@ -31,13 +32,13 @@ GridSense goes beyond device monitoring: it ingests raw electrical measurements 
 
 ```
 Shelly Pro EM-50
-      │ HTTP RPC (every 5s)
+      │ MQTT (preferred) / HTTP RPC fallback
       ▼
   collector ──► TimescaleDB (em_readings hypertable)
-      │
+      │              └─ anomalies hypertable (spike / night_load / sustained_high)
       └──► Redis pub/sub ──► api WebSocket ──► browser
                                │
-                               └── REST API (history, energy delta, live)
+                               └── REST API (history, energy, cost, anomalies)
 ```
 
 Full diagram and design rationale: [docs/architecture.md](docs/architecture.md)
@@ -68,7 +69,11 @@ TimescaleDB initialises automatically on first start (hypertable, 1-minute conti
 | `http://localhost:3002` | Web dashboard |
 | `http://localhost:3000/api/live` | Current reading direct from Shelly |
 | `http://localhost:3000/api/energy/today` | Today's consumption |
+| `http://localhost:3000/api/energy/consumption?period=day` | Consumption per day/month/year |
 | `http://localhost:3000/api/readings/history?from=…` | Historical time-series |
+| `http://localhost:3000/api/cost/today` | Today's cost by tariff band (F1/F2/F3) |
+| `http://localhost:3000/api/anomalies` | Recent anomaly events |
+| `http://localhost:3000/api/anomalies/summary` | Anomaly counts (last 24 h) |
 | `ws://localhost:3000/ws` | Real-time WebSocket stream |
 | `http://localhost:3001/health` | Collector health |
 
@@ -85,9 +90,32 @@ TimescaleDB initialises automatically on first start (hypertable, 1-minute conti
 | `channel` | `0` \| `1` | both | Filter by channel |
 | `resolution` | `5s` \| `1m` \| `5m` \| `15m` \| `1h` | auto | Time bucket size |
 
+### `GET /api/energy/consumption`
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `period` | `day` \| `month` \| `year` | `day` | Bucket granularity |
+| `from` | ISO 8601 | 30 d / 12 m / 5 y ago | Start of window |
+| `to` | ISO 8601 | now | End of window |
+
+Returns `{ data: [{ period, ch0Wh, ch1Wh, totalWh }], meta }` — max-min counter diff per bucket, same semantics as an electricity meter.
+
 ### `GET /api/energy/delta`
 
-Returns energy consumed and returned (Wh) between two timestamps using the device's cumulative counter — identical semantics to an electricity meter reading.
+Returns energy consumed and returned (Wh) between two timestamps using the device's cumulative counter.
+
+### `GET /api/cost/today` · `GET /api/cost/breakdown`
+
+Energy cost in euros broken down by Italian tariff band (F1/F2/F3, Europe/Rome timezone). Rate config via `TARIFF_F1_EUR_KWH`, `TARIFF_F2_EUR_KWH`, `TARIFF_F3_EUR_KWH` env vars.
+
+### `GET /api/anomalies`
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `from` | ISO 8601 | last 24 h | Start of window |
+| `type` | `spike` \| `night_load` \| `sustained_high` | all | Filter by type |
+| `channel` | `0` \| `1` | both | Filter by channel |
+| `limit` | number | 50 (max 500) | Max results |
 
 ### `WS /ws`
 
@@ -116,13 +144,17 @@ Reports are generated in `apps/web/playwright-report/`.
 ```
 gridsense/
 ├── apps/
-│   ├── collector/          Poll loop — reads Shelly, writes DB + Redis
+│   ├── collector/          Poll loop (MQTT/HTTP) — reads Shelly, writes DB + Redis
 │   ├── api/                REST API + WebSocket (Hono)
 │   └── web/                Next.js 15 dashboard + Playwright E2E
 ├── packages/
 │   ├── shelly-client/      Typed HTTP client for Shelly Gen2 RPC API
-│   ├── db/                 Drizzle schema + TimescaleDB migration
-│   └── events/             Redis pub/sub types, publisher, subscriber
+│   ├── db/                 Drizzle schema + TimescaleDB migrations
+│   ├── events/             Redis pub/sub types, publisher, subscriber
+│   ├── tariff/             Italian F1/F2/F3 tariff-band classifier
+│   └── anomaly/            Statistical anomaly detector (spike / night_load / sustained_high)
+├── infra/
+│   └── mosquitto/          Mosquitto MQTT broker config
 ├── docs/
 │   └── architecture.md     System design & decisions
 └── docker-compose.yml
@@ -132,12 +164,12 @@ gridsense/
 
 ## Roadmap
 
-- [x] Data acquisition — Shelly HTTP polling → TimescaleDB
-- [x] REST API — historical queries, energy delta, live endpoint
+- [x] Data acquisition — Shelly MQTT + HTTP polling fallback → TimescaleDB
+- [x] REST API — historical queries, energy delta, consumption per period, live endpoint
 - [x] Real-time — Redis pub/sub → WebSocket → dashboard
-- [x] Web dashboard — power flow, live metrics, 1h chart
-- [ ] Tariff engine — Italian F1/F2/F3 time-of-use cost calculation
-- [ ] Anomaly detection — statistical spike detection, idle load alerts
+- [x] Web dashboard — power flow, live metrics, 1h chart, consumption bar chart, dark/light theme
+- [x] Tariff engine — Italian F1/F2/F3 time-of-use cost calculation
+- [x] Anomaly detection — statistical spike detection, night load alerts, sustained high load
 - [ ] Demand forecasting — pattern-based next-hour prediction
 - [ ] AI assistant — natural language queries on consumption data
 

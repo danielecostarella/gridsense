@@ -94,6 +94,74 @@ export async function getEnergyToday(db: Db): Promise<EnergyDelta[]> {
   return getEnergyDelta(db, midnight, now);
 }
 
+export interface ConsumptionBucket {
+  /** Start of the period bucket (ISO string) */
+  period: string;
+  /** Channel 0 net consumption [Wh] */
+  ch0Wh: number;
+  /** Channel 1 net consumption [Wh] */
+  ch1Wh: number;
+  /** Total net consumption across both channels [Wh] */
+  totalWh: number;
+}
+
+/**
+ * Returns consumption per time bucket (day / month / year) using the device's
+ * cumulative counters. Groups data by period and computes
+ * `max(counter) - min(counter)` per bucket — same logic as an electricity meter.
+ *
+ * Timezone: Europe/Rome (handles CET/CEST automatically).
+ */
+export async function getConsumptionByPeriod(
+  db: Db,
+  period: "day" | "month" | "year",
+  from: Date,
+  to: Date
+): Promise<ConsumptionBucket[]> {
+  const fromIso = from.toISOString();
+  const toIso = to.toISOString();
+  const rows = await db.execute(sql`
+    SELECT
+      to_char(
+        date_trunc(
+          ${sql.raw(`'${period}'`)},
+          sampled_at AT TIME ZONE 'Europe/Rome'
+        ),
+        'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+      ) AS "period",
+      channel_id AS "channelId",
+      greatest(
+        max(total_act_energy) - min(total_act_energy),
+        0
+      ) AS "consumedWh"
+    FROM em_readings
+    WHERE sampled_at BETWEEN ${fromIso}::timestamptz AND ${toIso}::timestamptz
+    GROUP BY 1, channel_id
+    ORDER BY 1, channel_id
+  `);
+
+  // Pivot channel rows into per-bucket objects
+  const map = new Map<string, ConsumptionBucket>();
+
+  for (const row of rows as unknown as Array<{
+    period: string;
+    channelId: number;
+    consumedWh: number;
+  }>) {
+    const key = row.period;
+    if (!map.has(key)) {
+      map.set(key, { period: key, ch0Wh: 0, ch1Wh: 0, totalWh: 0 });
+    }
+    const bucket = map.get(key)!;
+    const wh = Number(row.consumedWh);
+    if (row.channelId === 0) bucket.ch0Wh = wh;
+    else bucket.ch1Wh = wh;
+    bucket.totalWh = bucket.ch0Wh + bucket.ch1Wh;
+  }
+
+  return Array.from(map.values());
+}
+
 /**
  * Power statistics for a time window — suitable for demand analysis.
  */

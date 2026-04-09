@@ -81,6 +81,7 @@ services:
       DATABASE_URL: postgres://gridsense:gridsense@timescaledb:5432/gridsense
       REDIS_URL: redis://redis:6379
       API_PORT: 3000
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
       - "3000:3000"
 

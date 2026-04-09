@@ -113,12 +113,12 @@ function NodeCircle({
         />
       )}
       {/* Node background */}
-      <circle cx={cx} cy={cy} r={28} fill="#161625" stroke={color} strokeWidth={1.5} strokeOpacity={active ? 0.6 : 0.2} />
+      <circle cx={cx} cy={cy} r={28} className="svg-node-bg" stroke={color} strokeWidth={1.5} strokeOpacity={active ? 0.6 : 0.2} />
       {/* Icon area — text fallback */}
-      <text x={cx} y={cy - 4} textAnchor="middle" fill={active ? color : "#64748b"} fontSize={11} fontWeight={600}>
+      <text x={cx} y={cy - 4} textAnchor="middle" fill={active ? color : "var(--color-chart-tick)"} fontSize={11} fontWeight={600}>
         {label}
       </text>
-      <text x={cx} y={cy + 10} textAnchor="middle" fill="#64748b" fontSize={9}>
+      <text x={cx} y={cy + 10} textAnchor="middle" className="svg-text-muted" fontSize={9}>
         {sublabel}
       </text>
     </g>
@@ -216,15 +216,15 @@ export function PowerFlow({ data }: Props) {
         />
 
         {/* Load indicators */}
-        <circle cx={318} cy={63} r={10} fill="#161625" stroke={LOAD_COLOR} strokeWidth={1} strokeOpacity={gridActive ? 0.5 : 0.15} />
-        <text x={318} y={67} textAnchor="middle" fill={gridActive ? LOAD_COLOR : "#334155"} fontSize={9}>L1</text>
+        <circle cx={318} cy={63} r={10} className="svg-node-bg" stroke={LOAD_COLOR} strokeWidth={1} strokeOpacity={gridActive ? 0.5 : 0.15} />
+        <text x={318} y={67} textAnchor="middle" fill={gridActive ? LOAD_COLOR : "var(--color-chart-tick)"} fontSize={9}>L1</text>
 
-        <circle cx={318} cy={117} r={10} fill="#161625" stroke={LOAD_COLOR} strokeWidth={1} strokeOpacity={gridActive ? 0.5 : 0.15} />
-        <text x={318} y={121} textAnchor="middle" fill={gridActive ? LOAD_COLOR : "#334155"} fontSize={9}>L2</text>
+        <circle cx={318} cy={117} r={10} className="svg-node-bg" stroke={LOAD_COLOR} strokeWidth={1} strokeOpacity={gridActive ? 0.5 : 0.15} />
+        <text x={318} y={121} textAnchor="middle" fill={gridActive ? LOAD_COLOR : "var(--color-chart-tick)"} fontSize={9}>L2</text>
 
         {/* ── Voltage / frequency label ── */}
         {ch0 && (
-          <text x={170} y={76} textAnchor="middle" fill="#475569" fontSize={9}>
+          <text x={170} y={76} textAnchor="middle" className="svg-text-muted" fontSize={9}>
             {ch0.voltageV.toFixed(1)} V · {ch0.frequencyHz.toFixed(1)} Hz
           </text>
         )}
